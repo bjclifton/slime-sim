@@ -1,0 +1,3 @@
+C:/Users/Bradley/Documents/SCHOOL/WINTER_2025/cmplx270/slimeSim/build/CMakeFiles/hello_window.dir
+C:/Users/Bradley/Documents/SCHOOL/WINTER_2025/cmplx270/slimeSim/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/Bradley/Documents/SCHOOL/WINTER_2025/cmplx270/slimeSim/build/CMakeFiles/ZERO_CHECK.dir

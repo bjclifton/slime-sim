@@ -1,0 +1,10 @@
+^C:\USERS\BRADLEY\DOCUMENTS\SCHOOL\WINTER_2025\CMPLX270\SLIMESIM\BUILD\CMAKEFILES\003CF29729D5D2816182CE3BF7CDCAE0\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/Bradley/Documents/SCHOOL/WINTER_2025/cmplx270/slimeSim -BC:/Users/Bradley/Documents/SCHOOL/WINTER_2025/cmplx270/slimeSim/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/Bradley/Documents/SCHOOL/WINTER_2025/cmplx270/slimeSim/build/hello_window.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

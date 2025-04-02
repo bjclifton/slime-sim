@@ -1,35 +1,39 @@
 #version 450 core
 
-layout (local_size_x = 16, local_size_y = 16) in;
+layout (local_size_x = 1, local_size_y = 1) in;  // One thread per agent
 
-layout(binding = 0, rgba32f) uniform image2D noiseTexture;
+struct Agent {
+    ivec2 position;  // Agent position in texture space (integer coordinates)
+    float angle;     // Agent's direction in radians
+};
 
-// Simple hash function
-uint hash(uint state) {
-    state ^= 2747636419u;
-    state *= 2654435769u;
-    state ^= state >> 16;
-    state *= 2654435769u;
-    state ^= state >> 16;
-    state *= 2654435769u;
-    return state;
-}
+// Define the SSBO binding point
+layout(binding = 1) buffer AgentBuffer {
+    Agent agents[]; // The array of agents
+};
 
-// Scale the hash value to the range [0, 1]
-float scaleToRange01(uint state) {
-    return float(state) / 4294967295.0;
-}
+layout(binding = 0, rgba32f) uniform image2D trailMap;  // Trail texture
 
 void main() {
-    ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy); // Get the pixel coordinates
+    uint agentID = gl_GlobalInvocationID.x;  // Get the ID of the current agent
+    
+    if (agentID >= 100) {
+        return;  // Only process up to NUM_AGENTS agents
+    }
 
-    // Generate a unique hash for each pixel based on its coordinates
-    uint state = uint(pixel_coords.x) + uint(pixel_coords.y) * 1024u; // Simple hash based on coordinates
-    uint hashed = hash(state);
+    Agent agent = agents[agentID];  // Get the agent from the buffer
 
-    // Scale the hashed value to the range [0, 1]
-    float noiseValue = scaleToRange01(hashed);
+    // Update the agent's position based on its angle
+    agent.position.x += int(cos(agent.angle) * 2.0f); // Move the agent based on its angle
+    agent.position.y += int(sin(agent.angle) * 2.0f);
 
-    // Store the nosie value as a grayscale color
-    imageStore(noiseTexture, pixel_coords, vec4(noiseValue, noiseValue, noiseValue, 1.0)); // Store the noise value in the texture
+    // Wrap around if out of bounds
+    agent.position.x = int(mod(float(agent.position.x) + 640.0, 640.0)); // Wrap horizontally
+    agent.position.y = int(mod(float(agent.position.y) + 480.0, 480.0)); // Wrap vertically
+
+    // Store a white trail at the agent's new position
+    imageStore(trailMap, agent.position, vec4(1.0, 1.0, 1.0, 1.0));  // Store white pixel at agent's position
+
+    // Optionally update the agent's position in the array (for the next frame)
+    agents[agentID] = agent;
 }

@@ -4,7 +4,7 @@
 #include <fstream>
 #include <sstream>
 
-const GLuint WIDTH = 640, HEIGHT = 480;
+const GLuint WIDTH = 1280, HEIGHT = 720;
 
 // Shader loading and program creation
 unsigned int load_shader(const std::string& shader_file, GLenum shader_type) {

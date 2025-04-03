@@ -3,14 +3,26 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <glm/glm.hpp>
 
 const GLuint WIDTH = 640, HEIGHT = 480;
-const int NUM_AGENTS = 1;
+const int NUM_AGENTS = 100;
 
 struct Agent {
-    GLint x, y;
-    GLfloat angle;
+    GLfloat x, y, angle;
+    GLint species;
 };
+
+unsigned int simple_hash_random(int seed) {
+    // Use ^ a bunch to make it random
+    seed ^= (seed << 13);
+    seed ^= (seed >> 17);
+    seed ^= (seed << 5);
+    seed ^= (seed >> 7);
+    seed ^= (seed << 11);
+    seed ^= (seed >> 19);
+    return seed;
+}
 
 // Shader loading and program creation
 unsigned int load_shader(const std::string& shader_file, GLenum shader_type) {
@@ -103,13 +115,23 @@ int main() {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, WIDTH, HEIGHT, 0, GL_RGBA, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    float currentTime = glfwGetTime();
+
+    int seed = simple_hash_random(static_cast<int>(currentTime)%10000); // Use time as seed
+    srand(static_cast<unsigned int>(seed * 1000)); // Seed with time + index
 
     // Create agents data
     Agent agents[NUM_AGENTS];
     for (int i = 0; i < NUM_AGENTS; ++i) {
-        agents[i].x = rand() % WIDTH;
-        agents[i].y = rand() % HEIGHT;
-        agents[i].angle = 0.785f;
+        agents[i].x = WIDTH / 2;
+        agents[i].y = HEIGHT / 2;
+        // random angle using time
+        // Use time + agent index to generate a unique random angle
+        // Generate random angle using srand
+        agents[i].angle = static_cast<float>(rand()) / RAND_MAX * 2.0f * 3.14159f; // Random angle
+        agents[i].species = i % 3; // Random species (0, 1, or 2)
+
+        std::cout << "Agent " << i << ": (" << agents[i].x << ", " << agents[i].y << "), angle: " << agents[i].angle << std::endl;
         // static_cast<float>(rand()) / RAND_MAX * 2.0f * 3.14159f; // Random angle
     }
 
@@ -159,15 +181,23 @@ int main() {
     glBindVertexArray(0);
 
     // Render loop
+    float lastTime = glfwGetTime();
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
+        float currentTime = glfwGetTime();
+        float deltaTime = currentTime - lastTime;
+        lastTime = currentTime;
+
         glClear(GL_COLOR_BUFFER_BIT);
+
         
         // Update agent positions using compute shader
         glUseProgram(compute_program);
+        glUniform1f(glGetUniformLocation(compute_program, "deltaTime"), deltaTime);
+
         glBindImageTexture(0, trailMap, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-        glDispatchCompute(WIDTH / 16, HEIGHT / 16, 1); // Dispatch in 16x16 workgroups for the entire texture
+        glDispatchCompute(NUM_AGENTS, 1, 1); // Dispatch in 16x16 workgroups for the entire texture
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Wait for the compute shader to finish
 
         // Render the texture to the screen

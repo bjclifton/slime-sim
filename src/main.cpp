@@ -5,8 +5,8 @@
 #include <sstream>
 #include <glm/glm.hpp>
 
-const GLuint WIDTH = 640, HEIGHT = 480;
-const int NUM_AGENTS = 100;
+const GLuint WIDTH = 1280, HEIGHT = 720;
+const int NUM_AGENTS = 10000;
 
 struct Agent {
     GLfloat x, y, angle;
@@ -39,7 +39,7 @@ unsigned int load_shader(const std::string& shader_file, GLenum shader_type) {
     int success;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
     if (!success) {
-        char infoLog[512];
+        char infoLog[1024];
         glGetShaderInfoLog(shader, 512, nullptr, infoLog);
         std::cerr << "Shader compilation failed: " << infoLog << std::endl;
     }
@@ -123,15 +123,15 @@ int main() {
     // Create agents data
     Agent agents[NUM_AGENTS];
     for (int i = 0; i < NUM_AGENTS; ++i) {
-        agents[i].x = WIDTH / 2;
-        agents[i].y = HEIGHT / 2;
+        agents[i].x = static_cast<float>(rand()) / RAND_MAX * WIDTH; // Random x position
+        agents[i].y = static_cast<float>(rand()) / RAND_MAX * HEIGHT; // Random y position
         // random angle using time
         // Use time + agent index to generate a unique random angle
         // Generate random angle using srand
         agents[i].angle = static_cast<float>(rand()) / RAND_MAX * 2.0f * 3.14159f; // Random angle
         agents[i].species = i % 3; // Random species (0, 1, or 2)
 
-        std::cout << "Agent " << i << ": (" << agents[i].x << ", " << agents[i].y << "), angle: " << agents[i].angle << std::endl;
+        // std::cout << "Agent " << i << ": (" << agents[i].x << ", " << agents[i].y << "), angle: " << agents[i].angle << std::endl;
         // static_cast<float>(rand()) / RAND_MAX * 2.0f * 3.14159f; // Random angle
     }
 
@@ -144,6 +144,10 @@ int main() {
     // Create and compile compute shader program
     unsigned int compute_program = create_compute_program("../../src/shaders/noise_shader.glsl");
     glUseProgram(compute_program);
+
+    unsigned int diffusion_program = create_compute_program("../../src/shaders/diffusion_shader.glsl");
+    glUseProgram(diffusion_program);
+
 
     // Bind the noise texture to texture unit 0
     glBindImageTexture(0, trailMap, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
@@ -195,10 +199,19 @@ int main() {
         // Update agent positions using compute shader
         glUseProgram(compute_program);
         glUniform1f(glGetUniformLocation(compute_program, "deltaTime"), deltaTime);
+        glUniform1f(glGetUniformLocation(compute_program, "time"), currentTime);
 
         glBindImageTexture(0, trailMap, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
         glDispatchCompute(NUM_AGENTS, 1, 1); // Dispatch in 16x16 workgroups for the entire texture
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Wait for the compute shader to finish
+
+        // Dispatch the diffusion shader (same size as the texture)
+        glUseProgram(diffusion_program);
+        glBindImageTexture(0, trailMap, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        glUniform1f(glGetUniformLocation(diffusion_program, "deltaTime"), currentTime);
+        glDispatchCompute(WIDTH / 16, HEIGHT / 16, 1);  // Dispatch in 16x16 workgroups
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);  // Wait for the diffusion to complete
+
 
         // Render the texture to the screen
         glUseProgram(render_program);  // Use rendering program

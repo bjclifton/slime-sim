@@ -5,8 +5,9 @@
 #include <sstream>
 #include <glm/glm.hpp>
 
-const GLuint WIDTH = 1280, HEIGHT = 720;
-const int NUM_AGENTS = 50000;
+const GLuint HEIGHT = 480;
+const GLuint WIDTH = (GLuint)(HEIGHT * 4.0f / 3.0f); // 16:9 aspect ratio
+const int NUM_AGENTS = 10000;
 
 struct Agent {
     GLfloat x, y, angle;

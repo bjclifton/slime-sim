@@ -72,15 +72,30 @@ float sense(Agent agent, float sensorAngleOffset) {
 
     // return 1.0 - (weight / 3.0); // Normalize to [0, 1] range
 
-    // ATTRACTION TO SPECIES 
+    // // ATTRACTION TO SPECIES 
+    // if (agent.species == 0) {
+    //     return trailColor.r; // Red channel for species 0
+    // } else if (agent.species == 1) {
+    //     return trailColor.g; // Green channel for species 1
+    // } else if (agent.species == 2) {
+    //     return trailColor.b; // Blue channel for species 2
+    // }
+    // return 0.0; // Default case (should not happen)
+
+    // Repulsion from different species
+    float weight = 0.0;
     if (agent.species == 0) {
-        return trailColor.r; // Red channel for species 0
+        weight -= trailColor.g;
+        weight -= trailColor.b; // Repel from green and blue channels for species 0
     } else if (agent.species == 1) {
-        return trailColor.g; // Green channel for species 1
+        weight -= trailColor.r;
+        weight -= trailColor.b; // Repel from red and blue channels for species 1
     } else if (agent.species == 2) {
-        return trailColor.b; // Blue channel for species 2
+        weight -= trailColor.r;
+        weight -= trailColor.g; // Repel from red and green channels for species 2
     }
-    return 0.0; // Default case (should not happen)
+    // Normalize the weight to [0, 1] range
+    return weight;
 }
 
 
@@ -156,11 +171,11 @@ void main() {
 
     // Map species to color
     if (agent.species == 0) {
-        color = ivec4(1.0, 0.0, 1.0, 1.0);  // Red for species 0
+        color = ivec4(1.0, 0.0, .0, 1.0);  // Red for species 0
     } else if (agent.species == 1) {
-        color = ivec4(1.0, 0.0, 1.0, 1.0);  // Green for species 1
+        color = ivec4(0.0, 1.0, 0.0, 1.0);  // Green for species 1
     } else if (agent.species == 2) {
-        color = ivec4(1.0, 0.0, 1.0, 1.0);  // Blue for species 2
+        color = ivec4(0.0, 0.0, 1.0, 1.0);  // Blue for species 2
     }
 
     // Store the color in the trail texture at the agent's position

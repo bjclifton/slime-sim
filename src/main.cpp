@@ -5,7 +5,7 @@
 #include <sstream>
 #include <glm/glm.hpp>
 
-const GLuint WIDTH = 1280, HEIGHT = 720;
+const GLuint WIDTH = 640, HEIGHT = 480;
 const int NUM_AGENTS = 10000;
 
 struct Agent {
@@ -142,7 +142,7 @@ int main() {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, agentBuffer);
 
     // Create and compile compute shader program
-    unsigned int compute_program = create_compute_program("../../src/shaders/noise_shader.glsl");
+    unsigned int compute_program = create_compute_program("../../src/shaders/agents.glsl");
     glUseProgram(compute_program);
 
     unsigned int diffusion_program = create_compute_program("../../src/shaders/diffusion_shader.glsl");
@@ -208,7 +208,7 @@ int main() {
         // Dispatch the diffusion shader (same size as the texture)
         glUseProgram(diffusion_program);
         glBindImageTexture(0, trailMap, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-        glUniform1f(glGetUniformLocation(diffusion_program, "deltaTime"), currentTime);
+        glUniform1f(glGetUniformLocation(diffusion_program, "deltaTime"), deltaTime);
         glDispatchCompute(WIDTH / 16, HEIGHT / 16, 1);  // Dispatch in 16x16 workgroups
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);  // Wait for the diffusion to complete
 

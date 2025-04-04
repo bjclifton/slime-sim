@@ -1,33 +1,34 @@
 #version 450 core
 
-// Number of agents
-#define NUM_AGENTS 100
-#define MOVE_SPEED 200.0
-#define PI 3.14159265358979323846
+layout (local_size_x = 1, local_size_y = 1) in;  // One thread per agent
 
+// Struct to represent each agent
 struct Agent {
-  vec2 position;
-  float angle;
+    float x;     // Agent's position (x-coordinate)
+    float y;     // Agent's position (y-coordinate)
+    float angle; // Agent's direction in radians
+    int species; // Agent's species identifier
 };
 
-// Shared memory to store all agents
-
-layout(std430, binding = 0) buffer Agents {
-  Agent agents[NUM_AGENTS];
+// Buffer to store the agents
+layout(binding = 1) buffer AgentBuffer {
+    Agent agents[]; // Array of agents
 };
 
-// Trail Map
-layout(binding = 1, rgba32f) uniform image2D TrailMap;  // Declare TrailMap as rgba32f image2D for both reading and writing
+// Uniform variables
+layout(binding = 0, rgba32f) uniform image2D trailMap;  // Trail texture
+uniform float deltaTime;  // Time passed since last frame
+uniform float time;       // Current time in seconds
 
-// Time passed since last update
-uniform float deltaTime;
-uniform float time;  // Pass time as a uniform from C++
-// Map size
-uniform vec2 mapSize;
+// Constants for simulation
+const uint NUM_AGENTS = 10000;  // Number of agents to process
+const float RANDOM_TURN = 0.2;  // Random turn factor
+const float BASE_SPEED = 100.0;  // Base speed of the agents
+const uint SCREEN_WIDTH = 640;  // Screen width
+const uint SCREEN_HEIGHT = 480; // Screen height
 
-// Pseudo random Number Generator
-uint hash(uint state)
-{
+// Simple hash function to generate pseudo-random numbers
+uint hash(uint state) {
     state ^= 2747636419u;
     state *= 2654435769u;
     state ^= state >> 16;
@@ -37,53 +38,125 @@ uint hash(uint state)
     return state;
 }
 
-float scaleToRange01(uint state)
-{
-    return state / 4294967295.0;
+// Scale the hash value to the range [0, 1]
+float scaleToRange01(uint state) {
+    return float(state) / 4294967295.0;
+}
+
+// Function to sense the trail strength in a given direction, only sensing its own color
+float sense(Agent agent, float sensorAngleOffset) {
+    // Determine the sensor's direction based on its angle and offset
+    float sensorAngle = agent.angle + sensorAngleOffset;
+    vec2 sensorDir = vec2(cos(sensorAngle), sin(sensorAngle));
+    
+    // Determine the position of the sensor (just slightly offset from the agent)
+    vec2 sensorPos = vec2(agent.x, agent.y) + sensorDir * 10.0; // Using a fixed offset of 10 units for sensing
+    ivec2 sensorCoord = ivec2(floor(sensorPos.x), floor(sensorPos.y));
+
+    // Clamp the sensor coordinates to the screen bounds
+    sensorCoord.x = int(clamp(sensorCoord.x, 0, SCREEN_WIDTH - 1));
+    sensorCoord.y = int(clamp(sensorCoord.y, 0, SCREEN_HEIGHT - 1));
+
+    // Sample the trail map at the sensor position to get the trail color
+    vec4 trailColor = imageLoad(trailMap, sensorCoord);
+
+    // calculate based on species of agent
+    float weight = 0.0;
+    if (agent.species == 0) {
+        weight = trailColor.r;  // Red channel for species 0
+    } else if (agent.species == 1) {
+        weight = trailColor.g;  // Green channel for species 1
+    } else if (agent.species == 2) {
+        weight = trailColor.b;  // Blue channel for species 2
+    }
+
+    // Return the weight of the sensed trail color
+    return weight;
 }
 
 
-layout(local_size_x = 1) in;
+// Function to reflect the agent's angle when it hits a wall
+void bounceOffWalls(inout Agent agent) {
+    // Reflect the agent's direction upon hitting the boundaries (bounce effect)
+    if (agent.x <= 0.0 || agent.x >= SCREEN_WIDTH) {
+        agent.angle = 3.1415 - agent.angle; // Reflect horizontally
+    }
+    if (agent.y <= 0.0 || agent.y >= SCREEN_HEIGHT) {
+        agent.angle = -agent.angle; // Reflect vertically
+    }
+}
 
+// Main function to update the agents and store their trails
 void main() {
-  uint id = gl_GlobalInvocationID.x;
+    uint agentID = gl_GlobalInvocationID.x;  // Get the ID of the current agent
+    
+    if (agentID >= NUM_AGENTS) {
+        return;  // Skip if agent ID exceeds the total number of agents
+    }
 
-  if (id >= NUM_AGENTS) {
-    return;
-  }
+    // Retrieve the agent's data from the buffer
+    Agent agent = agents[agentID];
 
-  Agent agent = agents[id];
+    // Generate a random value for the agent based on its position and the current time
+    uint randomState = hash(agentID + uint(agent.x * 100 + agent.y) + uint(time * 10));
+    float randomAngleVariation = scaleToRange01(randomState) * 2.0 * RANDOM_TURN - RANDOM_TURN;  // Random angle change
 
-  vec2 direction = vec2(cos(agent.angle), sin(agent.angle));
-  vec2 newPosition = agent.position + direction * deltaTime * MOVE_SPEED;
+    // Apply the random angle variation to the agent's current angle
+    agent.angle += randomAngleVariation;
 
-  // Check if agent is out of bounds
-  if (newPosition.x < 0.0 || newPosition.x >= mapSize.x || 
-      newPosition.y < 0.0 || newPosition.y >= mapSize.y) {
+    // Calculate the agent's movement speed adjusted by deltaTime
+    float speed = BASE_SPEED * deltaTime;  // Adjust movement based on deltaTime
 
-    // Generate a new random angle using position, id, and time
-    uint randomSeed = hash(uint(agent.position.x * 1000.0) + uint(agent.position.y * 1000.0) + id + uint(time * 100000.0));
-    float randomAngle = scaleToRange01(randomSeed) * 2.0 * PI; // Convert to radians
+    // Sense the environment
+    float weightForward = sense(agent, 0.0);  // Forward sensing
+    float weightLeft = sense(agent, 3.1415 / 8.0);  // Left sensing (45 degrees)
+    float weightRight = sense(agent, -3.1415 / 8.0); // Right sensing (-45 degrees)
 
-    // Clamp to map boundaries
-    newPosition.x = clamp(newPosition.x, 1.0, mapSize.x - 1.0);
-    newPosition.y = clamp(newPosition.y, 1.0, mapSize.y - 1.0);
+    // Decision making based on sensed environment
+    float randomSteerStrength = scaleToRange01(randomState) + 0.2; // from .2 to 1.2
+    float turnSpeed = 0.1 * 3.1415; // Arbitrary turn speed factor
 
-    // Update agent's angle
-    agent.angle = randomAngle;
-  }
+    // If the forward direction is clear, keep going straight
+    if (weightForward > weightLeft && weightForward > weightRight) {
+        agent.angle += 0.0;  // No change in angle
+    } else if (weightLeft > weightRight) {
+        agent.angle += randomSteerStrength * turnSpeed;  // Turn left
+    } else {
+        agent.angle -= randomSteerStrength * turnSpeed;  // Turn right
+    }
 
-  // Update agent's position
-  agent.position = newPosition;
+    // Update agent's position based on its angle and speed
+    agent.x += cos(agent.angle) * speed;
+    agent.y += sin(agent.angle) * speed;
 
-  // Update trail map based on the agent's position
-  ivec2 coord = ivec2(agent.position);
-  vec4 oldTrail = imageLoad(TrailMap, coord);  // Use imageLoad for reading data from the image
-  float trailWeight = 0.8; 
+    // Introduce some randomness to the movement for wiggling effect
+    agent.angle += randomSteerStrength * RANDOM_TURN;
 
-  // Write the updated trail to the image (TrailMap)
-  imageStore(TrailMap, coord, min(vec4(1.0), oldTrail + vec4(1.0) * trailWeight * deltaTime));
+    // Reflect agent's direction if it hits the screen boundaries (bounce effect)
+    bounceOffWalls(agent);
 
-  // Write back the updated agent
-  agents[id] = agent;
+    // Ensure the agent's position stays within the screen bounds
+    agent.x = clamp(agent.x, 0.0, float(SCREEN_WIDTH - 1));
+    agent.y = clamp(agent.y, 0.0, float(SCREEN_HEIGHT - 1));
+
+    // Convert agent's position to integer coordinates for the trail texture
+    ivec2 intPos = ivec2(floor(agent.x), floor(agent.y));
+
+    // Assign a color based on the agent's species
+    ivec4 color = ivec4(0, 0, 0, 0); // Default color (black)
+
+    // Map species to color
+    if (agent.species == 0) {
+        color = ivec4(1.0, 0.0, 0.0, 1.0);  // Red for species 0
+    } else if (agent.species == 1) {
+        color = ivec4(0.0, 1.0, 0.0, 1.0);  // Green for species 1
+    } else if (agent.species == 2) {
+        color = ivec4(0.0, 0.0, 1.0, 1.0);  // Blue for species 2
+    }
+
+    // Store the color in the trail texture at the agent's position
+    imageStore(trailMap, intPos, color);
+
+    // Optionally update the agent's position for the next frame
+    agents[agentID] = agent;
 }

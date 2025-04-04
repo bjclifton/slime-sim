@@ -4,7 +4,7 @@ layout (local_size_x = 16, local_size_y = 16) in;
 
 layout(binding = 0, rgba32f) uniform image2D trailMap;  // The trail texture
 
-float decayRate = 0.0001;  // Rate at which trail fades
+float decayRate = 0.1;  // Rate at which trail fades
 uniform float deltaTime;   // Time passed since last frame
 
 void main() {
@@ -36,7 +36,8 @@ void main() {
         sum /= float(count);
     }
 
-    currentColor = mix(currentColor, sum, 0.2);  // Blend current color with average
+    currentColor = mix(currentColor, sum, 0.1);  // Blend current color with average
+    //currentColor = mix(currentColor, vec4(0.0, 0.0, 0.0, 1.0), 0.1);  // Blend with black
 
     // Apply decay to the color's alpha channel (transparency)
     currentColor.r -= deltaTime * decayRate;  // Reduce red over time

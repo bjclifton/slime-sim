@@ -5,8 +5,8 @@
 #include <sstream>
 #include <glm/glm.hpp>
 
-const GLuint WIDTH = 640, HEIGHT = 480;
-const int NUM_AGENTS = 10000;
+const GLuint WIDTH = 1280, HEIGHT = 720;
+const int NUM_AGENTS = 50000;
 
 struct Agent {
     GLfloat x, y, angle;
@@ -149,6 +149,9 @@ int main() {
     glUseProgram(diffusion_program);
 
 
+
+
+
     // Bind the noise texture to texture unit 0
     glBindImageTexture(0, trailMap, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
@@ -158,8 +161,6 @@ int main() {
     unsigned int render_program = create_shader_program("../../src/shaders/quad.vert", "../../src/shaders/quad.frag");
     glUseProgram(render_program);
 
-    // Pass the texture to the fragment shader
-    glUniform1i(glGetUniformLocation(render_program, "noiseTexture"), 0);
 
     // Fullscreen quad
     float vertices[] = {
@@ -200,9 +201,16 @@ int main() {
         glUseProgram(compute_program);
         glUniform1f(glGetUniformLocation(compute_program, "deltaTime"), deltaTime);
         glUniform1f(glGetUniformLocation(compute_program, "time"), currentTime);
+        // Pass in NUM_AGENTS uint
+        glUniform1ui(glGetUniformLocation(compute_program, "NUM_AGENTS"), NUM_AGENTS);
+        // Pass dimensions of the texture to the compute shader as separate uints   
+        glUniform1ui(glGetUniformLocation(compute_program, "SCREEN_WIDTH"), WIDTH);
+        glUniform1ui(glGetUniformLocation(compute_program, "SCREEN_HEIGHT"), HEIGHT);
 
         glBindImageTexture(0, trailMap, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-        glDispatchCompute(NUM_AGENTS, 1, 1); // Dispatch in 16x16 workgroups for the entire texture
+        int workgroupSize = 16;  // Or 32 for larger workgroups
+        glDispatchCompute((NUM_AGENTS + workgroupSize - 1) / workgroupSize, 1, 1); // Round up to fit workgroups
+
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Wait for the compute shader to finish
 
         // Dispatch the diffusion shader (same size as the texture)

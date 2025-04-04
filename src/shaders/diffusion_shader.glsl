@@ -4,7 +4,7 @@ layout (local_size_x = 16, local_size_y = 16) in;
 
 layout(binding = 0, rgba32f) uniform image2D trailMap;  // The trail texture
 
-float decayRate = 0.1;  // Rate at which trail fades
+float decayRate = 0.4;  // Rate at which trail fades
 uniform float deltaTime;   // Time passed since last frame
 
 void main() {

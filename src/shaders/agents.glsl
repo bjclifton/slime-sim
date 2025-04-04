@@ -1,6 +1,6 @@
 #version 450 core
 
-layout (local_size_x = 1, local_size_y = 1) in;  // One thread per agent
+layout (local_size_x = 16, local_size_y = 16) in;  // One thread per agent
 
 // Struct to represent each agent
 struct Agent {
@@ -21,11 +21,11 @@ uniform float deltaTime;  // Time passed since last frame
 uniform float time;       // Current time in seconds
 
 // Constants for simulation
-const uint NUM_AGENTS = 10000;  // Number of agents to process
+uniform uint NUM_AGENTS; // Number of agents to process
 const float RANDOM_TURN = 0.2;  // Random turn factor
 const float BASE_SPEED = 100.0;  // Base speed of the agents
-const uint SCREEN_WIDTH = 640;  // Screen width
-const uint SCREEN_HEIGHT = 480; // Screen height
+uniform uint SCREEN_WIDTH;  // Screen width
+uniform uint SCREEN_HEIGHT; // Screen height
 
 // Simple hash function to generate pseudo-random numbers
 uint hash(uint state) {
@@ -60,18 +60,27 @@ float sense(Agent agent, float sensorAngleOffset) {
     // Sample the trail map at the sensor position to get the trail color
     vec4 trailColor = imageLoad(trailMap, sensorCoord);
 
-    // calculate based on species of agent
-    float weight = 0.0;
-    if (agent.species == 0) {
-        weight = trailColor.r;  // Red channel for species 0
-    } else if (agent.species == 1) {
-        weight = trailColor.g;  // Green channel for species 1
-    } else if (agent.species == 2) {
-        weight = trailColor.b;  // Blue channel for species 2
-    }
+    // ATTRACTION TO SIMILAR COLOR
+    // vec4 agentColor = vec4(0.0, 0.0, 0.0, 0.0); // Default color (black)
+    // agentColor = imageLoad(trailMap, ivec2(agent.x, agent.y)); // Load the agent's color
 
-    // Return the weight of the sensed trail color
-    return weight;
+    // Calculate the weight using abs difference between each rgb channel
+    // float weight = 0.0;
+    // weight += abs(trailColor.r - agentColor.r); // Red channel difference
+    // weight += abs(trailColor.g - agentColor.g); // Green channel difference
+    // weight += abs(trailColor.b - agentColor.b); // Blue channel difference
+
+    // return 1.0 - (weight / 3.0); // Normalize to [0, 1] range
+
+    // ATTRACTION TO SPECIES 
+    if (agent.species == 0) {
+        return trailColor.r; // Red channel for species 0
+    } else if (agent.species == 1) {
+        return trailColor.g; // Green channel for species 1
+    } else if (agent.species == 2) {
+        return trailColor.b; // Blue channel for species 2
+    }
+    return 0.0; // Default case (should not happen)
 }
 
 
@@ -99,10 +108,10 @@ void main() {
 
     // Generate a random value for the agent based on its position and the current time
     uint randomState = hash(agentID + uint(agent.x * 100 + agent.y) + uint(time * 10));
-    float randomAngleVariation = scaleToRange01(randomState) * 2.0 * RANDOM_TURN - RANDOM_TURN;  // Random angle change
+    // float randomAngleVariation = scaleToRange01(randomState) * 2.0 * RANDOM_TURN - RANDOM_TURN;  // Random angle change
 
-    // Apply the random angle variation to the agent's current angle
-    agent.angle += randomAngleVariation;
+    // // Apply the random angle variation to the agent's current angle
+    // agent.angle += randomAngleVariation;
 
     // Calculate the agent's movement speed adjusted by deltaTime
     float speed = BASE_SPEED * deltaTime;  // Adjust movement based on deltaTime
@@ -147,11 +156,11 @@ void main() {
 
     // Map species to color
     if (agent.species == 0) {
-        color = ivec4(1.0, 0.0, 0.0, 1.0);  // Red for species 0
+        color = ivec4(1.0, 0.0, 1.0, 1.0);  // Red for species 0
     } else if (agent.species == 1) {
-        color = ivec4(0.0, 1.0, 0.0, 1.0);  // Green for species 1
+        color = ivec4(1.0, 0.0, 1.0, 1.0);  // Green for species 1
     } else if (agent.species == 2) {
-        color = ivec4(0.0, 0.0, 1.0, 1.0);  // Blue for species 2
+        color = ivec4(1.0, 0.0, 1.0, 1.0);  // Blue for species 2
     }
 
     // Store the color in the trail texture at the agent's position
